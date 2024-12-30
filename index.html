@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>어려운 탈출 퍼즐</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #2c3e50;
+            color: white;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(8, 80px);
+            grid-gap: 10px;
+            margin-top: 20px;
+        }
+        .button {
+            width: 80px;
+            height: 40px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .button:hover {
+            transform: scale(1.1);
+        }
+        .fake {
+            background-color: #3498db;
+        }
+        #celebration {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: none;
+        }
+        #message {
+            font-size: 2em;
+            margin-top: 20px;
+        }
+        #escape {
+            display: none;  /* 초기에는 탈출 버튼 숨김 */
+        }
+        #fake-escape {
+            display: none;  /* 페이크 탈출 버튼 숨김 */
+        }
+        #errorScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            color: red;
+            font-size: 3em;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        #attempts {
+            font-size: 1.5em;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔒 탈출 퍼즐 🔒</h1>
+    <p>올바른 "탈출" 버튼을 찾아 클릭하세요! 다른 버튼에 숨겨져 있습니다.</p>
+    <div class="grid">
+        <button class="button fake" id="fake-escape">탈출</button> <!-- 페이크 탈출 버튼 -->
+        <button class="button fake">실패</button>
+        <button class="button" id="hint1">힌트 1</button>
+        <button class="button fake">힌트?</button>
+        <button class="button">땡</button>
+        <button class="button fake">클릭!</button>
+        <button class="button">잘못</button>
+        <button class="button" id="hint2">힌트 2</button> <!-- 힌트 버튼 2 -->
+        <button class="button fake">축하?</button>
+        <button class="button">누르지마</button>
+        <button class="button fake">모름</button>
+    </div>
+
+    <!-- 파티클 애니메이션을 위한 캔버스 -->
+    <canvas id="celebration"></canvas>
+    <div id="message"></div>
+
+    <!-- 오류 화면 -->
+    <div id="errorScreen">
+        <div>⚠️ 오류 발생! 시스템이 다운되었습니다! ⚠️</div>
+    </div>
+
+    <!-- 틀린 횟수 표시 -->
+    <div id="attempts">
+        틀린 횟수: <span id="attemptsCount">0</span>/5
+    </div>
+
+    <script>
+        // 파티클 캔버스 설정
+        const canvas = document.getElementById('celebration');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // 파티클 클래스
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = Math.random() * 5 + 2;
+                this.speedX = Math.random() * 3 - 1.5;
+                this.speedY = Math.random() * 3 - 1.5;
+                this.color = 'hsl(' + Math.random() * 360 + ', 100%, 50%)';
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.size *= 0.96;  // 크기 감소
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // 파티클 효과
+        const particlesArray = [];
+        function createParticles(e) {
+            for (let i = 0; i < 30; i++) {
+                particlesArray.push(new Particle(e.x, e.y));
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < particlesArray.length; i++) {
+                particlesArray[i].update();
+                particlesArray[i].draw();
+                if (particlesArray[i].size <= 0.5) {
+                    particlesArray.splice(i, 1);
+                    i--;
+                }
+            }
+            requestAnimationFrame(animateParticles);
+        }
+
+        // 버튼 클릭 처리
+        const buttons = document.querySelectorAll('.button');
+        const escapeButton = document.getElementById('escape');
+        const fakeEscapeButton = document.getElementById('fake-escape');
+        const message = document.getElementById('message');
+        const hint1Button = document.getElementById('hint1');
+        const hint2Button = document.getElementById('hint2');
+        const errorScreen = document.getElementById('errorScreen');
+        const attemptsCount = document.getElementById('attemptsCount');
+        let incorrectAttempts = 0;  // 틀린 횟수 카운트
+
+        // 버튼 클릭 시 탈출 버튼을 해당 버튼에 숨기기
+        hint1Button.addEventListener('click', () => {
+            escapeButton.style.display = 'inline-block'; // "힌트 1" 버튼 클릭 시 "탈출" 버튼 보이기
+            escapeButton.style.position = 'absolute';
+            escapeButton.style.top = hint1Button.offsetTop + 'px';
+            escapeButton.style.left = hint1Button.offsetLeft + 'px';
+
+            // 페이크 탈출 버튼도 보여주기
+            fakeEscapeButton.style.display = 'inline-block';
+            fakeEscapeButton.style.position = 'absolute';
+            fakeEscapeButton.style.top = hint1Button.offsetTop + 50 + 'px';  // 약간 아래에 위치
+            fakeEscapeButton.style.left = hint1Button.offsetLeft + 'px';
+        });
+
+        hint2Button.addEventListener('click', () => {
+            escapeButton.style.display = 'inline-block'; // "힌트 2" 버튼 클릭 시 "탈출" 버튼 보이기
+            escapeButton.style.position = 'absolute';
+            escapeButton.style.top = hint2Button.offsetTop + 'px';
+            escapeButton.style.left = hint2Button.offsetLeft + 'px';
+
+            // 페이크 탈출 버튼도 보여주기
+            fakeEscapeButton.style.display = 'inline-block';
+            fakeEscapeButton.style.position = 'absolute';
+            fakeEscapeButton.style.top = hint2Button.offsetTop + 50 + 'px';  // 약간 아래에 위치
+            fakeEscapeButton.style.left = hint2Button.offsetLeft + 'px';
+        });
+
+        // 페이크 탈출 버튼 클릭 시
+        fakeEscapeButton.addEventListener('click', () => {
+            incorrectAttempts++;  // 틀린 횟수 증가
+            updateAttempts();  // 틀린 횟수 업데이트
+            if (incorrectAttempts >= 5) {
+                showErrorScreen();  // 5번 틀리면 오류 화면 표시
+            } else {
+                alert("이건 가짜 탈출 버튼입니다! 다시 시도하세요.");
+            }
+        });
+
+        // 탈출 버튼 클릭 시
+        escapeButton.addEventListener('click', (e) => {
+            canvas.style.display = 'block';
+            createParticles(e);
+            message.textContent = '🎉 축하합니다! 탈출에 성공했습니다! 🎉';
+            animateParticles();
+
+            setTimeout(() => {
+                canvas.style.display = 'none';
+                message.textContent = '';
+            }, 1500);
+        });
+
+        // 나머지 버튼 클릭 시
+        buttons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                if (!button.classList.contains('fake') && button !== hint1Button && button !== hint2Button) {
+                    incorrectAttempts++;  // 틀린 횟수 증가
+                    updateAttempts();  // 틀린 횟수 업데이트
+                    if (incorrectAttempts >= 5) {
+                        showErrorScreen();  // 5번 틀리면 오류 화면 표시
+                    }
+                }
+            });
+        });
+
+        // 틀린 횟수 업데이트 함수
+        function updateAttempts() {
+            attemptsCount.textContent = incorrectAttempts; 
